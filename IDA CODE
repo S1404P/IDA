@@ -1,0 +1,333 @@
+"use client";
+import React from "react";
+
+import { useHandleStreamResponse } from "../utilities/runtime-helpers";
+
+function MainComponent() {
+  const [textInput, setTextInput] = useState("");
+  const [response, setResponse] = useState("");
+  const [selectedLanguage, setSelectedLanguage] = useState("english");
+  const [streamingMessage, setStreamingMessage] = useState("");
+  const [messages, setMessages] = useState([
+    {
+      role: "system",
+      content:
+        "You are IDA, an Intelligent Digital Assistant. You are helpful, friendly, and concise. You can store data in cloud services like Google Drive, Dropbox, or OneDrive.",
+    },
+  ]);
+  const [showReminder, setShowReminder] = useState(false);
+  const [showWeather, setShowWeather] = useState(false);
+  const [showAlarm, setShowAlarm] = useState(false);
+  const [showMusic, setShowMusic] = useState(false);
+  const [spokenText, setSpokenText] = useState("");
+  const [speaking, setSpeaking] = useState(false);
+  const [showSocial, setShowSocial] = useState(false);
+  const [cloudService, setCloudService] = useState(null);
+  const openSocialMedia = (platform) => {
+    const urls = {
+      instagram: "https://www.instagram.com",
+      youtube: "https://www.youtube.com",
+      twitter: "https://twitter.com",
+      facebook: "https://www.facebook.com",
+      linkedin: "https://www.linkedin.com",
+      tiktok: "https://www.tiktok.com",
+      pinterest: "https://www.pinterest.com",
+      snapchat: "https://www.snapchat.com",
+      reddit: "https://www.reddit.com",
+      whatsapp: "https://web.whatsapp.com",
+      google: "https://www.google.com",
+      amazon: "https://www.amazon.com",
+      netflix: "https://www.netflix.com",
+      spotify: "https://www.spotify.com",
+      github: "https://www.github.com",
+      "google-drive": "https://drive.google.com",
+      dropbox: "https://www.dropbox.com",
+      onedrive: "https://onedrive.live.com",
+    };
+    window.open(urls[platform], "_blank");
+  };
+  const speak = useCallback((text) => {
+    if ("speechSynthesis" in window) {
+      setSpeaking(true);
+      const utterance = new SpeechSynthesisUtterance(text);
+      const voices = window.speechSynthesis.getVoices();
+      const femaleVoice = voices.find(
+        (voice) =>
+          voice.name.includes("Female") || voice.name.includes("female")
+      );
+      if (femaleVoice) utterance.voice = femaleVoice;
+      utterance.pitch = 1.2;
+      utterance.rate = 1.2;
+      utterance.onend = () => setSpeaking(false);
+      window.speechSynthesis.cancel();
+      speechSynthesis.speak(utterance);
+    }
+  }, []);
+  const handleFinish = useCallback(
+    (message) => {
+      setMessages((prev) => [...prev, { role: "assistant", content: message }]);
+      setResponse(message);
+      speak(message);
+      setStreamingMessage("");
+    },
+    [speak]
+  );
+  const handleStreamResponse = useHandleStreamResponse({
+    onChunk: setStreamingMessage,
+    onFinish: handleFinish,
+  });
+  const handleFeatureClick = async (feature) => {
+    const userMessage = { role: "user", content: `I want to ${feature}` };
+    setMessages((prev) => [...prev, userMessage]);
+    const response = await fetch("/integrations/chat-gpt/conversationgpt4", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [...messages, userMessage],
+        stream: true,
+      }),
+    });
+    handleStreamResponse(response);
+    switch (feature) {
+      case "set a reminder":
+        setShowReminder(true);
+        break;
+      case "check the weather":
+        setShowWeather(true);
+        break;
+      case "play music":
+        setShowMusic(true);
+        break;
+      case "set an alarm":
+        setShowAlarm(true);
+        break;
+      case "use cloud storage":
+        setCloudService(true);
+        break;
+    }
+  };
+  const handleTextSubmit = async (e) => {
+    e.preventDefault();
+    if (!textInput.trim()) return;
+
+    const input = textInput.toLowerCase().trim();
+    const websites = [
+      "youtube",
+      "facebook",
+      "instagram",
+      "twitter",
+      "linkedin",
+      "tiktok",
+      "pinterest",
+      "snapchat",
+      "reddit",
+      "whatsapp",
+      "google",
+      "amazon",
+      "netflix",
+      "spotify",
+      "github",
+      "google-drive",
+      "dropbox",
+      "onedrive",
+    ];
+
+    if (websites.includes(input)) {
+      openSocialMedia(input);
+      setTextInput("");
+      return;
+    }
+
+    if (
+      input.includes("cloud storage") ||
+      input.includes("save") ||
+      input.includes("store")
+    ) {
+      const cloudMessage = {
+        role: "user",
+        content: "I want to use cloud storage. What are my options?",
+      };
+      setMessages((prev) => [...prev, cloudMessage]);
+      const response = await fetch("/integrations/chat-gpt/conversationgpt4", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [...messages, cloudMessage],
+          stream: true,
+        }),
+      });
+      handleStreamResponse(response);
+      setTextInput("");
+      return;
+    }
+
+    setSpokenText(textInput);
+    const userMessage = { role: "user", content: textInput };
+    setMessages((prev) => [...prev, userMessage]);
+
+    if (textInput.toLowerCase().includes("who are you")) {
+      const response =
+        "Hello! I'm IDA! Your Intelligent Digital Assistant. I can help you store and manage your data in cloud services like Google Drive, Dropbox, or OneDrive. How can I assist you today?";
+      setResponse(response);
+      speak(response);
+      setTextInput("");
+      return;
+    }
+
+    const response = await fetch("/integrations/chat-gpt/conversationgpt4", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [...messages, userMessage],
+        stream: true,
+      }),
+    });
+
+    handleStreamResponse(response);
+    setTextInput("");
+  };
+
+  return (
+    <div className="min-h-screen bg-[#121212]">
+      <div className="max-w-4xl mx-auto bg-[#1E1E1E] rounded-2xl shadow-lg p-8">
+        <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600 mb-6 font-roboto text-center">
+          IDA
+          <span className="block text-sm text-blue-400/60">
+            Your Intelligent Digital Assistant
+          </span>
+        </h1>
+        <a
+          href="https://www.linkedin.com/in/sarthakpalgotra/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block text-center text-white hover:text-blue-400 transition-colors duration-300 font-roboto text-xl font-bold bg-[#2A2A2A] px-4 py-2 rounded-lg border border-[#3A3A3A] shadow-lg mb-8 mx-auto w-fit"
+        >
+          Sarthak Palgotra
+        </a>
+
+        <div className="grid grid-cols-1 gap-8">
+          <div className="flex flex-col space-y-6">
+            <form onSubmit={handleTextSubmit} className="flex gap-2">
+              <input
+                type="text"
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                placeholder="Type your message..."
+                name="message"
+                className="flex-1 bg-[#2A2A2A] text-white p-4 rounded-2xl font-roboto focus:outline-none focus:ring-2 focus:ring-blue-500/50 border border-[#3A3A3A] backdrop-blur-sm"
+              />
+              <button
+                type="submit"
+                className="bg-gradient-to-r from-blue-500/80 to-purple-500/80 hover:from-blue-600/80 hover:to-purple-600/80 text-white p-4 rounded-2xl backdrop-blur-sm border border-[#3A3A3A] transform hover:scale-105 transition-all duration-300 flex items-center justify-center w-14 h-14"
+                disabled={!textInput.trim() || speaking}
+              >
+                <i
+                  className={`fas ${
+                    speaking ? "fa-volume-up animate-pulse" : "fa-paper-plane"
+                  } text-lg`}
+                ></i>
+              </button>
+            </form>
+            <div className="text-center">
+              <p className="text-white/80 font-roboto mb-2">{spokenText}</p>
+              {(response || streamingMessage) && (
+                <div className="bg-[#2A2A2A] backdrop-blur-sm border border-[#3A3A3A] p-6 rounded-2xl">
+                  <p className="text-white/90 font-roboto">
+                    {response || streamingMessage}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <button
+                onClick={() => openSocialMedia("instagram")}
+                className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white p-4 rounded-lg font-roboto shadow-md transition-all duration-300 hover:scale-105"
+              >
+                <i className="fab fa-instagram text-2xl"></i>
+              </button>
+              <button
+                onClick={() => openSocialMedia("youtube")}
+                className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white p-4 rounded-lg font-roboto shadow-md transition-all duration-300 hover:scale-105"
+              >
+                <i className="fab fa-youtube text-2xl"></i>
+              </button>
+              <button
+                onClick={() => openSocialMedia("twitter")}
+                className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white p-4 rounded-lg font-roboto shadow-md transition-all duration-300 hover:scale-105"
+              >
+                <i className="fab fa-twitter text-2xl"></i>
+              </button>
+              <button
+                onClick={() => openSocialMedia("facebook")}
+                className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white p-4 rounded-lg font-roboto shadow-md transition-all duration-300 hover:scale-105"
+              >
+                <i className="fab fa-facebook text-2xl"></i>
+              </button>
+              <button
+                onClick={() => openSocialMedia("linkedin")}
+                className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white p-4 rounded-lg font-roboto shadow-md transition-all duration-300 hover:scale-105"
+              >
+                <i className="fab fa-linkedin text-2xl"></i>
+              </button>
+              <button
+                onClick={() => openSocialMedia("tiktok")}
+                className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white p-4 rounded-lg font-roboto shadow-md transition-all duration-300 hover:scale-105"
+              >
+                <i className="fab fa-tiktok text-2xl"></i>
+              </button>
+              <button
+                onClick={() => openSocialMedia("pinterest")}
+                className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white p-4 rounded-lg font-roboto shadow-md transition-all duration-300 hover:scale-105"
+              >
+                <i className="fab fa-pinterest text-2xl"></i>
+              </button>
+              <button
+                onClick={() => openSocialMedia("snapchat")}
+                className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white p-4 rounded-lg font-roboto shadow-md transition-all duration-300 hover:scale-105"
+              >
+                <i className="fab fa-snapchat text-2xl"></i>
+              </button>
+              <button
+                onClick={() => openSocialMedia("reddit")}
+                className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white p-4 rounded-lg font-roboto shadow-md transition-all duration-300 hover:scale-105"
+              >
+                <i className="fab fa-reddit text-2xl"></i>
+              </button>
+              <button
+                onClick={() => openSocialMedia("whatsapp")}
+                className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white p-4 rounded-lg font-roboto shadow-md transition-all duration-300 hover:scale-105"
+              >
+                <i className="fab fa-whatsapp text-2xl"></i>
+              </button>
+              <button
+                onClick={() => openSocialMedia("facebook")}
+                className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white p-4 rounded-2xl font-roboto backdrop-blur-sm border border-[#3A3A3A] transition-all duration-300 hover:scale-105"
+              >
+                <i className="fab fa-facebook mr-2"></i>Facebook
+              </button>
+              <button
+                onClick={() => openSocialMedia("linkedin")}
+                className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white p-4 rounded-2xl font-roboto backdrop-blur-sm border border-[#3A3A3A] transition-all duration-300 hover:scale-105"
+              >
+                <i className="fab fa-linkedin mr-2"></i>LinkedIn
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <style jsx global>{`
+        @keyframes speak {
+          0%, 100% { transform: scaleY(1); }
+          50% { transform: scaleY(1.1); }
+        }
+        @keyframes lip {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-2px); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+export default MainComponent;
