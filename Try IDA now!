@@ -1,8 +1,2 @@
 IDA ACCESS LINK "https://intelligentdigitalassistant.created.app"
-import webbrowser
 
-# URL to open
-url = "https://intelligentdigitalassistant.created.app"
-
-# Open URL in default browser
-webbrowser.open(url)
